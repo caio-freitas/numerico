@@ -1,0 +1,2 @@
+/usr/bin/ar qc libalgelin.a  CMakeFiles/algelin.dir/include/algelin.cpp.o
+/usr/bin/ranlib libalgelin.a
