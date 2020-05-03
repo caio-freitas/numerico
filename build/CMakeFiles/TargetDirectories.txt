@@ -1,4 +1,0 @@
-/home/caio/Documents/numerico/build/CMakeFiles/rebuild_cache.dir
-/home/caio/Documents/numerico/build/CMakeFiles/edit_cache.dir
-/home/caio/Documents/numerico/build/CMakeFiles/algelin.dir
-/home/caio/Documents/numerico/build/CMakeFiles/ep1.dir
