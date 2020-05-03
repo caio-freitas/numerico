@@ -1,6 +1,7 @@
-Calculo para N=10, lambda=0.25
-Numero de operacoes: 3100
-Calculo para N=20, lambda=0.25
-Numero de operacoes: 28700
 Calculo para N=80, lambda=0.25
-Numero de operacoes: 1996700
+Numero de operacoes: 1996722.0
+
+O calculo demorou 0:00:13.911097 segundosCalculo para N=80, lambda=0.5
+Numero de operacoes: 998321.9999999999
+
+O calculo demorou 0:00:07.723069 segundos

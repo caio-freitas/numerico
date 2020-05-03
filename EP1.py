@@ -1,43 +1,66 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use("Agg")
 import datetime
 import time
+from numba import jit
 
 t_total = 1     # Tempo total de "simulacao"
 x_total = 1     # Tamanho da "barra"
 
 show=False
 
-def funcao_fonte(x, t): # funcao de 
-    #return 10*(x**2)*(x-1) - 60*x*t + 20*t
-    return 10*(np.cos(10*t))*(x**2)*((1-x)**2) - (1+(np.sin(10*t)))*(12*(x**2)-12*x+2)
+item = 'b'
 
+@jit
+def funcao_fonte(x, t): # funcao de  entrada
+    global item
+    #return 10*(x**2)*(x-1) - 60*x*t + 20*t
+    if item == 'a':
+        return 10*(np.cos(10*t))*(x**2)*((1-x)**2) - (1+(np.sin(10*t)))*(12*(x**2)-12*x+2) # item a
+    if item == 'b':
+        return (np.exp(t-x)*(np.cos(5*t*x)*(11*t-(25*t*t)+5*x-1)))                         # item b
+
+@jit
 def funcao_exata(x, t):
     #return (10*t*x*x*(x-1))
     return ((1 + np.sin(10*t))*(x**2)*((1-x)**2))
 
+@jit
 def gera_matriz_funcao_exata(M, N, delta_t, delta_x):
-    squanchy = np.zeros((int(M), int(N)), dtype='float64')
+    f_exata = np.zeros((int(M), int(N)), dtype='float64')
     for i in range(1, int(M)):
         t = (i-1)*delta_t
         for j in range(1, int(N-1)):
             x = j*delta_x
-            squanchy[i][j] = funcao_exata(x, t)
-    return squanchy
+            f_exata[i][j] = funcao_exata(x, t)
+    return f_exata
 
+@jit
 def cond_ini (x):
-    return ((x**2)*((1-x)**2))
+    #return ((x**2)*((1-x)**2))
+    return np.exp(-x)       
+
+@jit
+def g1(t): # condição de contorno, x=0
+    return (np.exp(t))
+
+@jit
+def g2(t): # condição de contorno, x=1
+    return (np.exp(t-1)*np.cos(5*t))
 
 
 N = 80         # numero de pontos analisados
 lamb = 0.5     # Constante da exponencial
 
-#Ns = [10, 20, 40, 80, 160, 320, 640]
-#lambdas = [0.25, 0.5]
-#Ns = [10]
+Ns = [10, 20, 40, 80, 160, 320]
+lambdas = [0.25, 0.5]
+
+# Ns = [10]
+# lambdas = [0.5]
+#Ns = [160]
 #lambdas = [0.5]
-Ns = [320]
-lambdas = [0.5]
 f = open("saidas.txt", "w+")
 
 for lamb in lambdas:
@@ -64,7 +87,13 @@ for lamb in lambdas:
         for i in range (0,N):
             matriz[0][i] = cond_ini(i*delta_x)
 
+        for j in range(0, int(M)):
+            matriz[j][0] = g1(j*delta_t)
+            matriz[j][N-1] = g2(j*delta_t)
+            
+
         a = datetime.datetime.now()
+        
         for i in range (1,int(M)): # para cada intervalo de tempo
             t = (i-1)*delta_t
             for j in range (1,N-1):# para cada intervalo de x
