@@ -14,16 +14,16 @@ show=False
 item = 'c'
 
 @jit
-def funcao_fonte(x, t): # funcao de entrada
-    global item, N
-    #return 10*(x**2)*(x-1) - 60*x*t + 20*t
+def funcao_fonte(x_pt, t, N): # funcao de entrada
+    global item
+    #return 10*(x_pt**2)*(x_pt-1) - 60*x_pt*t + 20*t
     if item == 'a':
-        return 10*(np.cos(10*t))*(x**2)*((1-x)**2) - (1+(np.sin(10*t)))*(12*(x**2)-12*x+2) # item a
+        return 10*(np.cos(10*t))*(x_pt**2)*((1-x_pt)**2) - (1+(np.sin(10*t)))*(12*(x_pt**2)-12*x_pt+2) # item a
     elif item == 'b':
-        return (np.exp(t-x)*(-np.sin(5*t*x)*5*x - 10*t*np.sin(5*t*x)+np.cos(5*t*x)*25*t*t))   # item b
+        return (np.ex_ptp(t-x_pt)*(-np.sin(5*t*x_pt)*5*x_pt - 10*t*np.sin(5*t*x_pt)+np.cos(5*t*x_pt)*25*t*t))   # item b
     elif item == 'c':
-        if x == int(N*0.25):
-            return (10000*(1 - 2*t*t))
+        if x_pt == int(N*0.25):
+            return (10000*(1 - 2*t*t))/delta_x
         else:
             return 0
 
@@ -44,7 +44,7 @@ def gera_matriz_funcao_exata(M, N, delta_t, delta_x):
             x = j*delta_x
             f_exata[i][j] = funcao_exata(x, t)
     for i in range (0,N): # para todos os x's analisados
-        f_exata[0][i] = cond_ini(i*delta_x)
+        f_exata[0][i] = cond_ini(i*delta_x, N)
 
     for j in range(0, int(M)+1): # para todos os t's analisados
         f_exata[j][0] = g1(j*delta_t)
@@ -52,14 +52,14 @@ def gera_matriz_funcao_exata(M, N, delta_t, delta_x):
     return f_exata
 
 @jit
-def cond_ini (x):
+def cond_ini (x, N):
     #return ((x**2)*((1-x)**2))
     if item =='a':
         return ((x**2)*((1-x)**2))
     elif item =='b':
         return np.exp(-x)       
     elif item == 'c':
-        return funcao_fonte(x, 0)
+        return funcao_fonte(x, 0, N)
 
 @jit
 def g1(t): # condição de contorno, x=0
@@ -77,13 +77,34 @@ def g2(t): # condição de contorno, x=1
     elif item =='b':
         return (np.exp(t-1)*np.cos(5*t))
 
+@jit
+def cholesky(A):
+    L = np.zeros_like(A)
+    D = np.zeros_like(A)
+    n = len(L)
+    for i in range(n):
+        for j in range(i+1):
+            if i==j:
+                val = A[i,i] - np.sum(np.square(L[i,:i]))
+                if val<0:
+                    return 0.0
+                L[i,i] = np.sqrt(val)
+            else:
+                L[i,j] = (A[i,j] - np.sum(L[i,:j]*L[j,:j]))/L[j,j]
+        D[i, i] = A[i, i]
+    for i in range(L.shape[0]):
+        for j in range(L.shape[1]):
+            L[i, j] /= D[i, i]
+        
+    return L, D
 
 
 Ns = [10, 20, 40, 80, 160] # numero de pontos analisados
-lambdas = [0.25]                 # Constante da exponencial
+Ns = [320]
+lambdas = [0.25, 0.5]                 # Constante da exponencial
 
 f = open("saidas.txt", "w+")
-
+implicito = True
 for lamb in lambdas:
     for N in Ns:
         print("Calculo para N={}, lambda={}".format(N, lamb))
@@ -106,7 +127,7 @@ for lamb in lambdas:
         contou = False
         matriz = np.zeros((int(M)+1, int(N)+1), dtype='float32') #inicializacao da matriz
         for i in range (0,N): # para todos os x's analisados
-            matriz[0][i] = cond_ini(i*delta_x)
+            matriz[0][i] = cond_ini(i*delta_x, N)
 
         for j in range(0, int(M)+1): # para todos os t's analisados
             matriz[j][0] = g1(j*delta_t)
@@ -114,29 +135,51 @@ for lamb in lambdas:
             
 
         a = datetime.datetime.now()
-        
-        for i in range (1,int(M)+1): # para cada intervalo de tempo
-            t = (i-1)*delta_t
-            for j in range (1,N):# para cada intervalo de x
-                x = j*delta_x
-                fx = funcao_fonte(x, t)
-                if item == 'c':
-                    fx = funcao_fonte(j, t)
-                matriz[i][j] = matriz[i-1][j] + (delta_t*(((matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1])/((delta_x)**2))+fx))
-                
-                cont_por += (1.0/um_porcento)
-                
-                if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
+        if not implicito:
+            for i in range (1,int(M)+1): # para cada intervalo de tempo
+                t = (i-1)*delta_t
+                for j in range (1,N):# para cada intervalo de x
+                    x = j*delta_x
+                    if item == 'c':
+                        fx = funcao_fonte(j, t, N)
+                    else:
+                        fx = funcao_fonte(x, t, N)
+                    matriz[i][j] = matriz[i-1][j] + (delta_t*(((matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1])/((delta_x)**2)) + fx))
                     
-                    if (contou == False):
-                        a = (datetime.datetime.now() - a)*100
-                        print("Estimativa de tempo = {}\n".format(a))
-                        contou = True
+                    cont_por += (1.0/um_porcento)
                     
-                    print(int(cont_por))
-                
-                por_ant = cont_por
-                
+                    if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
+                        
+                        if (contou == False):
+                            a = (datetime.datetime.now() - a)*100
+                            print("Estimativa de tempo = {}\n".format(a))
+                            contou = True
+                        
+                        print(int(cont_por))
+                    
+                    por_ant = cont_por
+        ############## metodo implicito ###########################
+        if implicito:
+            for i in range (1,int(M)): # para cada intervalo de tempo
+                t = (i-1)*delta_t
+                for j in range (1,N):# para cada intervalo de x
+                    x = j*delta_x
+                    matriz[i][j] = matriz[i-1][j] + ((lamb/2))*(((matriz[i][j-1]-(2*matriz[i][j])+matriz[i][j+1])+(matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1]))) + delta_t/2*(funcao_fonte(x, (i-1)*delta_t) + funcao_fonte(x, i*delta_t))
+                    
+                    cont_por += (1.0/um_porcento)
+                    
+                    if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
+                        
+                        if (contou == False):
+                            a = (datetime.datetime.now() - a)*100
+                            print("Estimativa de tempo = {}\n".format(a))
+                            contou = True
+                        
+                        print(int(cont_por))
+                    
+                    por_ant = cont_por
+
+        ###############################################################
         d = datetime.datetime.now()
         
         print("\nO calculo demorou {} segundos".format(d-c))

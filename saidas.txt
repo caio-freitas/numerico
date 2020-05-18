@@ -1,11 +1,7 @@
-Calculo para N=10, lambda=0.25
-Numero de operacoes: 3192.0
+Calculo para N=320, lambda=0.25
+Numero de operacoes: 130252482.0
 
-O calculo demorou 0:00:02.415680 segundosCalculo para N=20, lambda=0.25
-Numero de operacoes: 28782.0
+O calculo demorou 0:29:42.416304 segundosCalculo para N=320, lambda=0.5
+Numero de operacoes: 65126081.99999999
 
-O calculo demorou 0:00:00.551082 segundosCalculo para N=40, lambda=0.25
-Numero de operacoes: 243162.0
-
-O calculo demorou 0:00:05.000369 segundosCalculo para N=80, lambda=0.25
-Numero de operacoes: 1996722.0
+O calculo demorou 0:13:30.963909 segundos
