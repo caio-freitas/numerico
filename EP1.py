@@ -73,8 +73,10 @@ def g1(t): # condição de contorno, x=0
 def g2(t): # condição de contorno, x=1
     
     if item =='a' or item == 'c':
+        
         return 0
     elif item =='b':
+
         return (np.exp(t-1)*np.cos(5*t))
 
 @jit
