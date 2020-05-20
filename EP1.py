@@ -11,7 +11,7 @@ x_total = 1     # Tamanho da "barra"
 
 show=False
 
-item = 'c'
+item = 'a'
 
 @jit
 def funcao_fonte(x_pt, t, N): # funcao de entrada
@@ -99,14 +99,14 @@ def decomporLDL(ł, N):
 
 
     # Condição inicial para prossegir com os cálculos
-    D[0] = D[0]
+    D[0] = 1 + 2*ł
 
     # Cálculo dos valores dos vetores L e D
     for i in range (1, len(D)):
-        D[i] = D[0] - (((L[0]/ł)**2)*ł)
+        D[i] = 1+2*ł - (((-ł/D[i-1])**2)*D[i-1])
     
     for i in range (0, len(L)):
-        L[i] = L[0]/ł
+        L[i] = -ł/D[i]
 
     # Criação das matrizes L e D a partir dos vetores
     D_matriz = np.zeros((N, N))
@@ -144,7 +144,7 @@ def invert_bidiagonal(M, type):
     elif type == "upper":
         for i in range(M.shape[0] - 1):
             inverse[i][i+1] = -M[i][i+1]
-        for k in range(2, M.shape[0]):
+        for k in range(2, M.shape[0]):  
             for i in range(M.shape[0] - k):
                 inverse[i][k+i] = inverse[i][k+i-1]*inverse[i+1][k+i]/inverse[i+1][k+i-1]
 
@@ -217,30 +217,15 @@ for lamb in lambdas:
                 x = j*delta_x
 
                 v = np.zeros((N))
-                v[0] = matriz[i-1][0] + delta_t*funcao_fonte(0, i+1, N) + lamb*g1((i+1)*delta_t)
-                v[N-1] = matriz[i-1][N] + delta_t*funcao_fonte(1, i+1, N) + lamb*g2((i+1)*delta_t)
+                v[0] = matriz[i-1][0] + delta_t*funcao_fonte(0, i, N) + lamb*g1((i)*delta_t)
+                v[N-1] = matriz[i-1][N] + delta_t*funcao_fonte(1, i, N) + lamb*g2((i)*delta_t)
                 L, D, Lt = decomporLDL(lamb, N)
 
                 for j in range(1, N-1):
-                    v[j] = matriz[i-1][j] + delta_t*funcao_fonte(j, i+1, N)
-                
+                    v[j] = matriz[i-1][j] + delta_t*funcao_fonte(j, i, N)
                 aux = np.dot(invert_bidiagonal(L, "lower"), v)
                 aux = np.dot(invert_diagonal(D), aux)
-                matriz[i] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                matriz[i][:N] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
 
 
         ###############################################################
