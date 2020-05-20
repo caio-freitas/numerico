@@ -99,14 +99,14 @@ def decomporLDL(ł, N):
 
 
     # Condição inicial para prossegir com os cálculos
-    D[0] = a[0]
+    D[0] = D[0]
 
     # Cálculo dos valores dos vetores L e D
     for i in range (1, len(D)):
-        D[i] = a[0] - (((b[0]/ł)**2)*ł)
+        D[i] = D[0] - (((L[0]/ł)**2)*ł)
     
     for i in range (0, len(L)):
-        L[i] = b[0]/ł
+        L[i] = L[0]/ł
 
     # Criação das matrizes L e D a partir dos vetores
     D_matriz = np.zeros((N, N))
@@ -123,6 +123,17 @@ def decomporLDL(ł, N):
 
     return (L_matriz, D_matriz, LT_matriz)
 
+
+def invert_diagonal(M):
+    inverse = np.diag(np.ones((M.shape[0])))
+    for i in range(M.shape[0]):
+        try:
+            inverse[i][i] = 1/M[i][i]
+        except Exception as e:
+            print(e)
+    return inverse
+
+@jit
 def invert_bidiagonal(M, type):
     inverse = np.diag(np.ones((M.shape[0])))
     if type == "lower":
@@ -133,15 +144,15 @@ def invert_bidiagonal(M, type):
     elif type == "upper":
         for i in range(M.shape[0] - 1):
             inverse[i][i+1] = -M[i][i+1]
-        for k in range(M.shape[0] - 1):
-            for i in range(M.shape[0] - k - 1):
-                inverse[k+i][k+i+1] = inverse[k+i-1][k+i]*inverse[k+i][k+i+1]/inverse[k+i-1][k+i-1]
+        for k in range(2, M.shape[0]):
+            for i in range(M.shape[0] - k):
+                inverse[i][k+i] = inverse[i][k+i-1]*inverse[i+1][k+i]/inverse[i+1][k+i-1]
 
         return inverse
 
 
 Ns = [10, 20, 40, 80, 160] # numero de pontos analisados
-Ns = [320]
+#Ns = [320]
 lambdas = [0.25, 0.5]                 # Constante da exponencial
 
 f = open("saidas.txt", "w+")
@@ -206,13 +217,12 @@ for lamb in lambdas:
                 x = j*delta_x
 
                 v = np.zeros((N))
-                v[0] = matriz[i-1][0] + delta_t*fx(0, i+1) + lamb*g1((i+1)*delta_t)
-                v[N-1] = matriz[i-1][N] + delta_t*fx(1, i+1) + lamb*g2((i+1)*delta_t)
-
+                v[0] = matriz[i-1][0] + delta_t*funcao_fonte(0, i+1, N) + lamb*g1((i+1)*delta_t)
+                v[N-1] = matriz[i-1][N] + delta_t*funcao_fonte(1, i+1, N) + lamb*g2((i+1)*delta_t)
                 L, D, Lt = decomporLDL(lamb, N)
 
                 for j in range(1, N-1):
-                    v[j] = matriz[i-1][j] + delta_t*fx(j, i+1)
+                    v[j] = matriz[i-1][j] + delta_t*funcao_fonte(j, i+1, N)
                 
                 aux = np.dot(invert_bidiagonal(L, "lower"), v)
                 aux = np.dot(invert_diagonal(D), aux)
