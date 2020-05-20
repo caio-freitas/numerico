@@ -79,26 +79,65 @@ def g2(t): # condição de contorno, x=1
 
         return (np.exp(t-1)*np.cos(5*t))
 
+'''
+A decomposição LDLt recebe
+
+- a: Vetor com a diagonal principal da matriz
+- b: Vetor com a subdiagonal da matriz
+
+E retorna
+- L: matriz bidiagonal inferior
+- D: Matriz diagonal
+- Lt: A transposta de L
+'''
 @jit
-def cholesky(A):
-    L = np.zeros_like(A)
-    D = np.zeros_like(A)
-    n = len(L)
-    for i in range(n):
-        for j in range(i+1):
-            if i==j:
-                val = A[i,i] - np.sum(np.square(L[i,:i]))
-                if val<0:
-                    return 0.0
-                L[i,i] = np.sqrt(val)
-            else:
-                L[i,j] = (A[i,j] - np.sum(L[i,:j]*L[j,:j]))/L[j,j]
-        D[i, i] = A[i, i]
-    for i in range(L.shape[0]):
-        for j in range(L.shape[1]):
-            L[i, j] /= D[i, i]
-        
-    return L, D
+def decomporLDL(ł, N):
+
+    # L e D Vetores
+    D = np.zeros(N)
+    L = np.zeros(N-1)
+
+
+    # Condição inicial para prossegir com os cálculos
+    D[0] = a[0]
+
+    # Cálculo dos valores dos vetores L e D
+    for i in range (1, len(D)):
+        D[i] = a[0] - (((b[0]/ł)**2)*ł)
+    
+    for i in range (0, len(L)):
+        L[i] = b[0]/ł
+
+    # Criação das matrizes L e D a partir dos vetores
+    D_matriz = np.zeros((N, N))
+    L_matriz = np.zeros((N, N))
+
+    for i in range (0, N):
+        D_matriz[i][i] = D[i]
+        L_matriz[i][i] = 1      # A matriz L deve ter 1's na diagonal principal
+    
+    for i in range (0, N-1):
+        L_matriz[i+1][i] = L[i] #Colocando a subdiagonal de L
+
+    LT_matriz = np.transpose(L_matriz)
+
+    return (L_matriz, D_matriz, LT_matriz)
+
+def invert_bidiagonal(M, type):
+    inverse = np.diag(np.ones((M.shape[0])))
+    if type == "lower":
+        M = np.transpose(M)
+        inverse = invert_bidiagonal(M, "upper")
+        return np.transpose(inverse)
+
+    elif type == "upper":
+        for i in range(M.shape[0] - 1):
+            inverse[i][i+1] = -M[i][i+1]
+        for k in range(M.shape[0] - 1):
+            for i in range(M.shape[0] - k - 1):
+                inverse[k+i][k+i+1] = inverse[k+i-1][k+i]*inverse[k+i][k+i+1]/inverse[k+i-1][k+i-1]
+
+        return inverse
 
 
 Ns = [10, 20, 40, 80, 160] # numero de pontos analisados
@@ -164,22 +203,35 @@ for lamb in lambdas:
         if implicito:
             for i in range (1,int(M)): # para cada intervalo de tempo
                 t = (i-1)*delta_t
-                for j in range (1,N):# para cada intervalo de x
-                    x = j*delta_x
-                    matriz[i][j] = matriz[i-1][j] + ((lamb/2))*(((matriz[i][j-1]-(2*matriz[i][j])+matriz[i][j+1])+(matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1]))) + delta_t/2*(funcao_fonte(x, (i-1)*delta_t) + funcao_fonte(x, i*delta_t))
-                    
-                    cont_por += (1.0/um_porcento)
-                    
-                    if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
-                        
-                        if (contou == False):
-                            a = (datetime.datetime.now() - a)*100
-                            print("Estimativa de tempo = {}\n".format(a))
-                            contou = True
-                        
-                        print(int(cont_por))
-                    
-                    por_ant = cont_por
+                x = j*delta_x
+
+                v = np.zeros((N))
+                v[0] = matriz[i-1][0] + delta_t*fx(0, i+1) + lamb*g1((i+1)*delta_t)
+                v[N-1] = matriz[i-1][N] + delta_t*fx(1, i+1) + lamb*g2((i+1)*delta_t)
+
+                L, D, Lt = decomporLDL(lamb, N)
+
+                for j in range(1, N-1):
+                    v[j] = matriz[i-1][j] + delta_t*fx(j, i+1)
+                
+                aux = np.dot(invert_bidiagonal(L, "lower"), v)
+                aux = np.dot(invert_diagonal(D), aux)
+                matriz[i] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         ###############################################################
         d = datetime.datetime.now()
