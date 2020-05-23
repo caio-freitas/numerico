@@ -1,18 +1,7 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-#matplotlib.use("Agg")
 import datetime
-import time
-from numba import jit
-
-t_total = 1     # Tempo total de "simulacao"
-x_total = 1     # Tamanho da "barra"
-
-show=False
-
-item = 'a'
-
 
 def funcao_fonte(x_pt, t, N): # funcao de entrada
     global item
@@ -55,21 +44,21 @@ def cond_ini (x, N):
     if item =='a':
         return ((x**2)*((1-x)**2))
     elif item =='b':
-        return np.exp(-x)       
+        return np.exp(-x)
     elif item == 'c':
         return funcao_fonte(x, 0, N)
 
 def g1(t): # condição de contorno, x=0
-    
+
     if item == 'a' or item == 'c':
         return 0
-    elif item =='b': 
+    elif item =='b':
         return (np.exp(t))
 
 def g2(t): # condição de contorno, x=1
-    
+
     if item =='a' or item == 'c':
-        
+
         return 0
     elif item =='b':
 
@@ -97,7 +86,7 @@ def decomporLDL(ł, N):
     # Cálculo dos valores dos vetores L e D
     for i in range (1, len(D)):
         D[i] = 1+2*ł - (((-ł/D[i-1])**2)*D[i-1])
-    
+
     for i in range (0, len(L)):
         L[i] = -ł/D[i]
 
@@ -108,7 +97,7 @@ def decomporLDL(ł, N):
     for i in range (0, N):
         D_matriz[i][i] = D[i]
         L_matriz[i][i] = 1      # A matriz L deve ter 1's na diagonal principal
-    
+
     for i in range (0, N-1):
         L_matriz[i+1][i] = L[i] #Colocando a subdiagonal de L
 
@@ -137,170 +126,227 @@ def invert_bidiagonal(M, type):
     elif type == "upper":
         for i in range(M.shape[0] - 1):
             inverse[i][i+1] = -M[i][i+1]
-        for k in range(2, M.shape[0]):  
+        for k in range(2, M.shape[0]):
             for i in range(M.shape[0] - k):
                 inverse[i][k+i] = inverse[i][k+i-1]*inverse[i+1][k+i]/inverse[i+1][k+i-1]
-        print(inverse)
+
         return inverse
 
+def solve(A, b, m_type):
+    if A.shape[0] != A.shape[1]:
+        print("Erro, matriz nao quadrada!")
+        return -1
+    solution = np.zeros((A.shape[0]))
+    if m_type == "lower":
+        solution[0] = b[0]/A[0][0]
+        for i in range(1, A.shape[0]):
+            solution[i] = b[i] - A[i][i-1]*solution[i-1]
+        return solution
 
-Ns = [10, 20, 40, 80, 160] # numero de pontos analisados
-#Ns = [320]
-lambdas = [0.25, 0.5]                 # Constante da exponencial
+    elif m_type == "upper":
+        solution[A.shape[0] - 1] = b[A.shape[0]-1]/A[A.shape[0] - 1][A.shape[0] - 1]
+        for i in range(2, A.shape[0]-1):
+            j = A.shape[0] - i
+            solution[j] = b[j] - A[j][j+1]*solution[j+1]
+        return solution
+
+    elif m_type == "diagonal":
+        for i in range(A.shape[0]):
+            solution[i] = b[i]/A[i][i]
+        return solution
+
+t_total = 1     # Tempo total de "simulacao"
+x_total = 1     # Tamanho da "barra"
+
+show=False
 
 f = open("saidas.txt", "w+")
-implicito = True
-metodo = "euler"
 
-for lamb in lambdas:
-    for N in Ns:
-        if not implicito:
-            print("Calculo para N={}, lambda={}".format(N, lamb))
-            f.write("Calculo para N={}, lambda={}\n".format(N, lamb))
-            M = (N**2)/lamb         # numero de instantes de tempo analisados
-            delta_x = x_total/N     # resolucao espacial do analise
-            delta_t = t_total/M     # resolucao temporal da analise
 
-            # Variaveis para acompanhar o andamento do processo
+cmd = input("Escolha qual tarefa quer rodar:\n- '1': Primeira tarefa\n- '2': Segunda tarefa\n- 'q': Fechar programa\n")
+while True:
+    item = input("Escolha qual item rodar:\n- 'a': item a\n- 'b': item b\n- 'c': item c\n- 'q': Fechar programa\n")
+    if item == 'q':
+        break
+    N = int(input("Escolha qual o valor de N: "))
+    lamb = float(input("Escolha qual o valor de lambda: "))
+    if int(cmd) == 1:
+        implicito = False
+    elif int(cmd) == 2:
+        implicito = True
+    metodo = str(input("Escolha qual o metodo a ser usado:\n- 'euler': Metodo de Euler\n- 'cn': Metodo de Crank-Nicolson\n"))
 
-            um_porcento = (int((M-1)*(N-2)))/100 #Calculo da porcentagem
-            print("Numero de operacoes: {}\n".format(um_porcento*100))
-            f.write("Numero de operacoes: {}\n".format(um_porcento*100))
-            cont_por = 0
-            ind = '%'
-            por_ant = 0
+    ######################## Metodo das Diferencas Finitas #######################
+    if not implicito:
+        print("Calculo para N={}, lambda={}".format(N, lamb))
+        f.write("Calculo para N={}, lambda={}\n".format(N, lamb))
+        M = (N**2)/lamb         # numero de instantes de tempo analisados
+        delta_x = x_total/N     # resolucao espacial do analise
+        delta_t = t_total/M     # resolucao temporal da analise
 
-            c = datetime.datetime.now()
-            
-            contou = False
-            matriz = np.zeros((int(M)+1, int(N)+1), dtype='float64') #inicializacao da matriz
-            for i in range (0,N): # para todos os x's analisados
-                matriz[0][i] = cond_ini(i*delta_x, N)
+        # Variaveis para acompanhar o andamento do processo
 
-            for j in range(0, int(M)+1): # para todos os t's analisados
-                matriz[j][0] = g1(j*delta_t)
-                matriz[j][N] = g2(j*delta_t)
-                
+        um_porcento = (int((M)*(N-1)))/100 #Calculo da porcentagem
+        print("Numero de operacoes: {}\n".format(um_porcento*100))
+        f.write("Numero de operacoes: {}\n".format(um_porcento*100))
+        cont_por = 0
+        ind = '%'
+        por_ant = 0
 
-            a = datetime.datetime.now()
-            for i in range (1,int(M)+1): # para cada intervalo de tempo
-                t = (i-1)*delta_t
-                for j in range (1,N):# para cada intervalo de x
-                    x = j*delta_x
-                    if item == 'c':
-                        fx = funcao_fonte(j, t, N)
-                    else:
-                        fx = funcao_fonte(x, t, N)
-                   
-                    matriz[i][j] = matriz[i-1][j] + (delta_t*(((matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1])/((delta_x)**2)) + fx))
-                    cont_por += (1.0/um_porcento)
-                    
-                    if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
-                        
-                        if (contou == False):
-                            a = (datetime.datetime.now() - a)*100
-                            print("Estimativa de tempo = {}\n".format(a))
-                            contou = True
-                        
-                        print(int(cont_por))
-                    
-                    por_ant = cont_por
-        ############## metodo implicito ###########################
-        if implicito:
-            print("Calculo para N={}, lambda={}".format(N, lamb))
-            f.write("Calculo para N={}, lambda={}\n".format(N, lamb))
-            delta_x = x_total/N     # resolucao espacial do analise
-            M = 1/delta_x         # numero de instantes de tempo analisados
-            delta_t = t_total/M     # resolucao temporal da analise
+        c = datetime.datetime.now()
 
-            # Variaveis para acompanhar o andamento do processo
+        contou = False
+        matriz = np.zeros((int(M)+1, int(N)+1), dtype='float64') #inicializacao da matriz
+        for i in range (0,N): # para todos os x's analisados
+            matriz[0][i] = cond_ini(i*delta_x, N)
 
-            um_porcento = (int((M-1)*(N-1)))/100 #Calculo da porcentagem
-            print("Numero de operacoes: {}\n".format(um_porcento*100))
-            f.write("Numero de operacoes: {}\n".format(um_porcento*100))
-            cont_por = 0
-            ind = '%'
-            por_ant = 0
+        for j in range(0, int(M)+1): # para todos os t's analisados
+            matriz[j][0] = g1(j*delta_t)
+            matriz[j][N] = g2(j*delta_t)
 
-            c = datetime.datetime.now()
-            
-            contou = False
-            matriz = np.zeros((int(M)+1, int(N)+1), dtype='float64')    # inicializacao da matriz
-            for i in range (0,N):                                       # para todos os x's analisados
-                matriz[0][i] = cond_ini(i*delta_x, N)
 
-            for j in range(0, int(M)+1):                                # para todos os t's analisados
-                matriz[j][0] = g1(j*delta_t)
-                matriz[j][N] = g2(j*delta_t)
-                
+        a = datetime.datetime.now()
+        for i in range (1,int(M)+1): # para cada intervalo de tempo
+            t = (i-1)*delta_t
+            for j in range (1,N):# para cada intervalo de x
+                x = j*delta_x
+                if item == 'c':
+                    fx = funcao_fonte(j, t, N) #funcao da fonte discretizada para N em vez de x
+                else:
+                    fx = funcao_fonte(x, t, N)
 
-            a = datetime.datetime.now()
-            if metodo == "euler":
+                matriz[i][j] = matriz[i-1][j] + (delta_t*(((matriz[i-1][j-1]-(2*matriz[i-1][j])+matriz[i-1][j+1])/((delta_x)**2)) + fx))
+                cont_por += (1.0/um_porcento)
+
+                if (int(cont_por) != int(por_ant)): # Calculo da estimativa de tempo e porcentagem
+
+                    if (contou == False):
+                        a = (datetime.datetime.now() - a)*100
+                        print("Estimativa de tempo = {}\n".format(a))
+                        contou = True
+
+                    print(int(cont_por), "%")
+
+                por_ant = cont_por
+    ############## metodo implicito ###########################
+    else:
+        print("Calculo para N={}, lambda={}".format(N, lamb))
+        f.write("Calculo para N={}, lambda={}\n".format(N, lamb))
+        delta_x = x_total/N     # resolucao espacial do analise
+        M = N         # numero de instantes de tempo analisados
+        delta_t = delta_x     # resolucao temporal da analise
+
+        # Variaveis para acompanhar o andamento do processo
+        c = datetime.datetime.now()
+
+        matriz = np.zeros((int(M)+1, int(N)+1), dtype='float64')    # inicializacao da matriz
+        for i in range (0,N+1):                                       # para todos os x's analisados
+            matriz[0][i] = cond_ini(i*delta_x, N)
+
+        for j in range(0, int(M)+1):                                # para todos os t's analisados
+            matriz[j][0] = g1(j*delta_t)
+            matriz[j][N] = g2(j*delta_t)
+
+
+        a = datetime.datetime.now()
+
+        if metodo == "euler":
+            print("Rodando o metodo de euler")
+
+            L, D, Lt = decomporLDL(lamb, N-1)
+            #print(np.dot(L, np.dot(D, Lt)))
+            for k in range (1, int(M)+1): # para cada intervalo de tempo
                 v = np.zeros((N-1))
-                L, D, Lt = decomporLDL(lamb, N - 1)
-                #print(np.dot(L, np.dot(D, Lt)))
-                for k in range (0, int(M)): # para cada intervalo de tempo
-                    t = (k+1)*delta_t
-
-                    v[0] = matriz[k][0] + delta_t*funcao_fonte(0, t, N-2) + lamb*g1(t)
+                t = (k-1)*delta_t
+                if item == 'c':
+                    v[0] = matriz[k-1][0] + delta_t*funcao_fonte(1, k*delta_t, N) + lamb*g1(k*delta_t)          # funcao da fonte discretizada para N em vez de x
                     for j in range(1, N-2):
-                        x = j*delta_x
-                        v[j] = matriz[k][j] + delta_t*funcao_fonte(x, t, N-2)
+                        x = (j)*delta_x
+                        v[j] = matriz[k-1][j] + delta_t*funcao_fonte(j+1, k*delta_t, N)                         # funcao da fonte discretizada para N em vez de x
 
-                    v[N-2] = matriz[k][N-2] + delta_t*funcao_fonte((N-2)*delta_x, t, N-2) + lamb*g2(t)
+                    v[N-2] = matriz[k-1][N-2] + delta_t*funcao_fonte((N-1), k*delta_t, N) + lamb*g2(k*delta_t)  # funcao da fonte discretizada para N em vez de x
 
-                    
-                    aux = np.dot(invert_bidiagonal(L, "lower"), v)
-                    aux = np.dot(invert_diagonal(D), aux)
-                    matriz[k+1][0:N-1] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
-
-                    # aux = np.dot(invert_bidiagonal(Lt, "upper"), invert_diagonal(D))
-                    # aux = np.dot(aux, invert_bidiagonal(L, "lower"))
-                    # matriz[i+1][1:N-1] = np.dot(aux, v)
-                    #print(matriz[i])
-            elif metodo == "crank-nicolson":
-                v = np.zeros((N-1))
-                L, D, Lt = decomporLDL(lamb, N - 1)
-                for k in range (1,int(M)): # para cada intervalo de tempo
-                    t = (k+1)*delta_t
-
-                    v[0] =  matriz[k][0] + lamb*g1(t) + delta_t*(funcao_fonte(delta_x, k*delta_t, N-1) + funcao_fonte(delta_x, t, N-1))/2
-                    v[N-2] = matriz[k][N-2] + lamb*g2(t) + delta_t*(funcao_fonte((N-1)*delta_x, k*delta_t, N-1) + funcao_fonte((N-1)*delta_x, t, N-1))/2
+                else:
+                    v[0] = matriz[k-1][0] + delta_t*funcao_fonte(delta_x, k*delta_t, N) + lamb*g1(k*delta_t)
                     for j in range(1, N-2):
+                        x = (j)*delta_x
+                        v[j] = matriz[k-1][j] + delta_t*funcao_fonte(x, k*delta_t, N)
+
+                    v[N-2] = matriz[k-1][N-2] + delta_t*funcao_fonte((N-1)*delta_x, k*delta_t, N) + lamb*g2(k*delta_t)
+
+                # com calculo de inversas
+                aux = np.dot(invert_bidiagonal(L, "lower"), v)
+                aux = np.dot(invert_diagonal(D), aux)
+                matriz[k][0:N-1] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
+
+
+                # alternativa ao calculo de inversas ##########
+                # y = solve(L, v, "lower")
+                # z = solve(D, y, "diagonal")
+                # matriz[k][0:N-1] = solve(Lt, z, "upper")
+                ################################################
+
+        elif metodo == "cn":
+            v = np.zeros((N-1))
+
+            L, D, Lt = decomporLDL(lamb/2, N - 1)
+
+            for k in range (0,int(M)): # para cada intervalo de tempo
+                t = (k+1)*delta_t
+                if item == 'c':
+                    t = (k+1)*delta_t
+                    v[0] =  matriz[k][1] + 0.5*lamb*(matriz[k+1][0] + matriz[k][0] - 2*matriz[k][1]+ matriz[k][2]) + 0.5*delta_t*(funcao_fonte(1, k*delta_t, N-1) + funcao_fonte(1, t, N-1))
+                    for j in range(0, N-1): # para cada x
                         x = j*delta_x
-                        v[j] = matriz[k][j] + lamb*(matriz[k][j-1] - 2*matriz[k][j] + matriz[k][j+1])/2 + delta_t*(funcao_fonte(x, k*delta_t, N-1) + funcao_fonte(x, t, N-1))/2
-                        
-                    L, D, Lt = decomporLDL(lamb/2, N-1)
-                
-                    aux = np.dot(invert_bidiagonal(L, "lower"), v)
-                    aux = np.dot(invert_diagonal(D), aux)
-                    matriz[k+1][0:N-1] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
+                        v[j] = matriz[k][j] + 0.5*lamb*(matriz[k][j-1] - 2*matriz[k][j] + matriz[k][j+1]) + 0.5*delta_t*(funcao_fonte(j, k*delta_t, N-1) + funcao_fonte(j, t, N-1))
+
+                    v[N-2] = matriz[k][N-1] + 0.5*lamb*(matriz[k+1][N] + matriz[k][N] - 2*matriz[k][N-1] + matriz[k][N-2]) + 0.5*delta_t*(funcao_fonte((N-1), k*delta_t, N-1) + funcao_fonte((N-1), t, N-1))
+
+                else:
+                    t = (k+1)*delta_t
+                    v[0] =  matriz[k][1] + 0.5*lamb*(matriz[k+1][0] + matriz[k][0] - 2*matriz[k][1]+ matriz[k][2]) + 0.5*delta_t*(funcao_fonte(delta_x, k*delta_t, N-1) + funcao_fonte(delta_x, t, N-1))
+                    for j in range(1, N-2): # para cada x
+                        x = j*delta_x
+                        v[j] = matriz[k][j+1] + 0.5*lamb*(matriz[k][j] - 2*matriz[k][j+1] + matriz[k][j+2]) + 0.5*delta_t*(funcao_fonte((j+1)*delta_x, k*delta_t, N-1) + funcao_fonte((j+1)*delta_x, t, N-1))
+
+                    v[N-2] = matriz[k][N-1] + 0.5*lamb*(matriz[k+1][N] + matriz[k][N] - 2*matriz[k][N-1] + matriz[k][N-2]) + 0.5*delta_t*(funcao_fonte((N-1)*delta_x, k*delta_t, N-1) + funcao_fonte((N-1)*delta_x, t, N-1))
 
 
-        #print(matriz[0])
+                # com calculo de inversas ######################
+                aux = np.dot(invert_bidiagonal(L, "lower"), v)
+                aux = np.dot(invert_diagonal(D), aux)
+                matriz[k+1][1:N] = np.dot(invert_bidiagonal(Lt, "upper"), aux)
+
+
+                # alternativa ao calculo de inversas ###########
+                # y = solve(L, v, "lower")
+                # z = solve(D, y, "diagonal")
+                # matriz[k][0:N-1] = solve(Lt, z, "upper")
+                ################################################
+
         ###############################################################
         d = datetime.datetime.now()
         print("\nO calculo demorou {} segundos".format(d-c))
         f.write("\nO calculo demorou {} segundos".format(d-c))
         matriz = np.transpose(matriz)
-        
+
         ################ plotar matriz ########################
         plt.figure()
         plt.xlabel("Tempo (t)")
         plt.ylabel("Posicao (x)")
         plt.matshow(matriz, fignum = 0, interpolation = 'none', cmap = 'hot', origin = 'lower', aspect="auto")
-        plt.savefig("./fig/%s/Resultado-N_%d_Lambda_%f.png" %(item, N,lamb), bbox_inches='tight', dpi=400)
+        plt.savefig("Resultado-%s-N_%d_Lambda_%f.png" %(item, N,lamb), bbox_inches='tight', dpi=400)
         if show:
             plt.show()
         plt.close()
 
-        ############ gerar matriz com função exata e plotar erro entre matrizes#########
+        ############ gerar matriz com função exata e plotar erro entre matrizes #########
         matriz_ideal = gera_matriz_funcao_exata(M, N, delta_t, delta_x)
         matriz_ideal = np.transpose(matriz_ideal)
         # plt.xlabel("Tempo (t)")
         # plt.ylabel("Posicao (x)")
-        # plt.matshow(matriz - matriz_ideal, fignum = 0, interpolation = 'none', cmap = 'Reds', origin = 'lower', aspect="auto")
-        # plt.savefig("./fig/%s/IDEAL_%d_Lambda_%f.png" %(item,N,lamb), bbox_inches='tight', dpi=400)
+        # plt.matshow(matriz - matriz_ideal, fignum = 0, interpolation = 'none', cmap = 'hot', origin = 'lower', aspect="auto")
+        # plt.savefig("./fig/%s/ERRO_%d_Lambda_%f.png" %(item,N,lamb), bbox_inches='tight', dpi=400)
         # if show:
         #     plt.show()
         # plt.close()
@@ -310,7 +356,7 @@ for lamb in lambdas:
         plt.xlabel("Posicao (x)")
         plt.ylabel("Erro em T=1")
         plt.grid()
-        plt.savefig("./fig/%s/ErroEm1-N_%d_Lambda_%f.png" %(item,N,lamb), bbox_inches='tight', dpi=400)
+        plt.savefig("ErroEm1-%s-N_%d_Lambda_%f.png" %(item,N,lamb), bbox_inches='tight', dpi=400)
         if show:
             plt.show()
         plt.close()
@@ -325,8 +371,7 @@ for lamb in lambdas:
         plt.legend(loc='upper right')
         plt.xlabel("Posicao (x)")
         plt.ylabel("Temperatura")
-        plt.savefig("./fig/%s/GraficosSolucao-N_%d_Lambda_%f.png" %(item, N,lamb), bbox_inches='tight', dpi=100)
+        plt.savefig("GraficosSolucao-%s-N_%d_Lambda_%f.png" %(item, N,lamb), bbox_inches='tight', dpi=100)
         plt.close()
 
 f.close()
-print("Terminouuu")
