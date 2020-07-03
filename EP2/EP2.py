@@ -226,6 +226,7 @@ N = 10
 
 '''
 Definição dos vetores u
+DE ONDE CARALHOS A GENTE TIRA ESSE U??
 '''
 
 u = np.zeros((N, Nf))
