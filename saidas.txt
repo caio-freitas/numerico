@@ -1,3 +1,5 @@
-Calculo para N=80, lambda=0.5
+Calculo para N=40, lambda=0.5
+Numero de operacoes: 124800.0
 
-O calculo demorou 0:00:00.726021 segundos
+O calculo demorou 0:00:00.014076 segundos
+O calculo demorou 0:00:01.972726 segundos
