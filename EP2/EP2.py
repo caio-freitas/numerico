@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
+import time
+import random
 
 #############################################################################################################
 ########################################## Funcao da fonte ##################################################
@@ -9,16 +12,13 @@ def funcao_fonte(x_pt, t, ponto):
 
     global item
 
-    if (x_pt >= (ponto - h/2) and x_pt <= (ponto + h/2)):
-
-        r_t = 10*(1 + np.cos(5*t))
-        return r_t/delta_x
-
-    else:
-
-        return 0
-
-    #     return 10*(np.cos(10*t))*(x_pt**2)*((1-x_pt)**2) - (1+(np.sin(10*t)))*(12*(x_pt**2)-(12*x_pt)+2) # item a
+    # if (x_pt >= (ponto - h/2) and x_pt <= (ponto + h/2)): uncomment
+    #     r_t = 10*(1 + np.cos(5*t))
+    #     return r_t/delta_x
+    # else:
+    #     return 0
+    
+    return 10*(np.cos(10*t))*(x_pt**2)*((1-x_pt)**2) - (1+(np.sin(10*t)))*(12*(x_pt**2)-(12*x_pt)+2) # item a comment
     # elif item == 'b':
     #     return (np.exp(t-x_pt)*(-np.sin(5*t*x_pt)*5*x_pt - 10*t*np.sin(5*t*x_pt)+np.cos(5*t*x_pt)*25*t*t))   # item b
     # elif item == 'c':
@@ -33,8 +33,8 @@ def funcao_fonte(x_pt, t, ponto):
 
 def cond_ini (x):
 
-    return 0
-    #     return ((x**2)*((1-x)**2))
+    #return 0
+    return ((x**2)*((1-x)**2))
     # elif item =='b':
     #     return np.exp(-x)
     # elif item == 'c':
@@ -61,10 +61,10 @@ def g2(t): # condição de contorno, x=1
 
     #     return (np.exp(t-1)*np.cos(5*t))
 
-#############################################################################################################
-########################################## Decomposicao LDLt ################################################
-#############################################################################################################
-
+'''
+Função que gera resultado da decomposição LDLt para a matriz
+tridiagonal presente no método de Crank-Nicolson 
+'''
 def decomporLDL(ł):
     # L e D Vetores
     D = np.zeros(N-1)
@@ -94,10 +94,12 @@ def decomporLDL(ł):
 
     return (L_matriz, D_matriz, LT_matriz)
 
-#############################################################################################################
-####################################### Resolucao LDLt*x = b ################################################
-#############################################################################################################
-
+'''
+Resolução de um sistema Ax = b, onde A pode ser:
+- "lower": triangular inferior
+- "upper": triangular superior
+- "diagonal": diagonal
+'''
 def solve(A, b, m_type):
     if A.shape[0] != A.shape[1]:
         print("Erro, matriz nao quadrada!")
@@ -105,15 +107,24 @@ def solve(A, b, m_type):
     solution = np.zeros((A.shape[0]))
     if m_type == "lower":
         solution[0] = b[0]/A[0][0]
+        
         for i in range(1, A.shape[0]):
-            solution[i] = b[i] - A[i][i-1]*solution[i-1]
+            summ = 0
+            for j in range(1, i + 1):
+                summ += A[i][i-j]*solution[i-j]
+            solution[i] = (b[i] - summ)
+            
         return solution
 
     elif m_type == "upper":
         solution[A.shape[0] - 1] = b[A.shape[0]-1]/A[A.shape[0] - 1][A.shape[0] - 1]
-        for i in range(2, A.shape[0]-1):
+        for i in range(2, A.shape[0]+1):
             j = A.shape[0] - i
-            solution[j] = b[j] - A[j][j+1]*solution[j+1]
+            summ = 0
+            for k in range(1, i):
+                summ += A[j][j+k]*solution[j+k]
+            solution[j] = (b[j] - summ)
+            
         return solution
 
     elif m_type == "diagonal":
@@ -121,16 +132,45 @@ def solve(A, b, m_type):
             solution[i] = b[i]/A[i][i]
         return solution
 
+'''
+Decomposição LDLt de uma matriz A genérica
+'''
+
+def decomposeLDLt(A):
+    L = np.diag(np.ones(len(A)))
+    D = np.diag(np.ones(len(A)))
+    v = np.ones(len(A))
+    for i in range(len(A)):
+        for j in range(i):
+            v[j] = L[i][j]*D[j][j]
+        summ = 0
+        for k in range(i):
+            summ += L[i][k]*v[k]
+        D[i][i] = A[i][i] - summ
+        
+        
+        for j in range(i+1, len(A)):
+            summ = 0
+            for k in range(i):
+                summ += L[j][k]*v[k]
+            L[j][i] = (A[j][i] - summ)/D[i][i]
+    return L, D
+
 
 #############################################################################################################
 ########################################### Resolucao Crank #################################################
 #############################################################################################################
-
+save_crank = True
 #------------------------------ Funcao que resolve por Crank-Nicholson --------------------------------------
 
 def Crank (pontos): # Retorna a matriz com os UTk nas colunas
 
+    pixels_tot = (N-1)*(N-1)*len(pontos) + len(pontos)*(N-1)
+    porc = int(pixels_tot/100)
+    cont_porc = 0
+    cont_pixels = 0
     Temps_T = np.zeros((N-1, len(pontos)))
+    contou = False
 
     for fonte in range (len(pontos)):
 
@@ -145,7 +185,6 @@ def Crank (pontos): # Retorna a matriz com os UTk nas colunas
         x_linha = np.zeros ((N-1))
 
         #----------------------------------------- Condicoes iniciais -----------------------------------------------    
-
         for i in range (N+1):
             matriz_final[i][0] = cond_ini(i*delta_x)
 
@@ -154,7 +193,6 @@ def Crank (pontos): # Retorna a matriz com os UTk nas colunas
 
         for k in range (1, N+1):
             matriz_final[N][k] = g2(k*delta_t)
-
         #----------------------------------------- Inicio do calculo ------------------------------------------------
 
         for k in range (0, N):
@@ -170,17 +208,38 @@ def Crank (pontos): # Retorna a matriz com os UTk nas colunas
                 else:
                     b[i-1] = (delta_t/2)*(funcao_fonte(delta_x*i, delta_t*k, pontos[fonte])+funcao_fonte(delta_x*i, delta_t*(k+1), pontos[fonte]))+(lamb/2)*(matriz_final[i-1][k] + matriz_final[i+1][k]) + (1-lamb)*matriz_final[i][k]
 
-            # y = solve(L_matriz, b, "lower")
-            # z = solve(D_matriz, y, "diagonal")
-            # x_linha = solve(LT_matriz, z, "upper")
+                cont_pixels += 1
+                
+                if (cont_pixels%porc == 0):
+                    if (contou == False):
+                            C = (datetime.datetime.now() - A)*100
+                            print("Estimativa de tempo = {}\n".format(C))
+                            contou = True
+                    cont_porc += 1
+                    print(cont_porc, "% concluido")
 
-            x_linha = np.linalg.inv(L_matriz.dot(D_matriz).dot(LT_matriz)).dot(b)
+            y = solve(L_matriz, b, "lower")
+            z = solve(D_matriz, y, "diagonal")
+            x_linha = solve(LT_matriz, z, "upper")
 
             for j in range (0, N-1):
                 x[j][0] = x_linha[j]
 
             for i in range (1, N):
                 matriz_final[i][k+1] = x[i-1][0]
+
+        if save_crank:
+            plt.matshow(matriz_final, fignum = 0, interpolation = 'none', cmap = 'hot', origin = 'lower', aspect="auto")
+            #plt.title("Temperaturas, N="+str(N) + ", Item " + item)
+            plt.savefig("Crank-Nicolson-Mapa-{}_N-{}.png".format(item, str(N)), dpi=400)
+            #plt.show()
+            #plt.close()
+
+            # plt.plot(matriz_final[:,N], fignum = 0, interpolation = 'none', cmap = 'hot', origin = 'lower', aspect="auto")
+            # plt.title("Temperaturas, N="+str(N) + ", Item " + item)
+            # plt.savefig("Crank-Nicolson-Grafico-{}_N-{}.png".format(item, str(N)), dpi=400)
+            # plt.show()
+            # plt.close()
 
         #---------------------------------------- Preenchendo com uT(xi) --------------------------------------------
 
@@ -280,24 +339,23 @@ def Cria_graficos (aks, UTs, Temps_T, nf, Erro_2):
     plt.ylabel("Temperatura")
     plt.grid(True)
     plt.savefig("Result_item-{}_N-{}.png".format(item, str(N)), dpi=400)
-    plt.show()
+    #plt.show()
     plt.close()
 
     for i in range (1, N):
 
         Erro[i] = abs(resultado[i]-UTs[i-1])
 
-    plt.plot(label_x, Erro, '-b', label = 'Erro instantaneo')
-    plt.plot(label_x, Erro_2_graf, '-r', label = 'Erro Quadratico')
-    plt.title("Erro (|resultado - fornecido|), N="+str(N) + ", Item " + item)
+    plt.plot(label_x, Erro, '-b', label = 'Módulo do erro instântaneo')
+    plt.plot(label_x, Erro_2_graf, '-r', label = 'Erro quadrático médio')
+    plt.title("Erro, N="+str(N) + ", Item " + item)
     plt.xlabel("Posição")
     plt.ylabel("Temperatura")
     plt.grid(True)
     plt.legend()
     plt.savefig("Erro_item-{}_N-{}.png".format(item, str(N)), dpi=400)
-    plt.show()
+    #plt.show()
     plt.close()
-
 
 
 #############################################################################################################
@@ -319,17 +377,23 @@ if (item == 'a'):
     h = delta_x
     pontos = np.array([0.35])
     UTs = np.zeros((N-1, 1))
+    A = datetime.datetime.now()
 
     #---------------------------------------- Inicio da resolucao -----------------------------------------------
 
     Temps_T = Crank(pontos)
 
+
     for i in range (1, N):
         UTs[i-1][0] = 7*Temps_T[i-1][0]
 
     Normal, b = Montar(Temps_T, UTs)
-
-    print("a1 é igual a: ", (np.linalg.inv(Normal).dot(b))[0][0])
+    NL, ND = decomposeLDLt(Normal)
+    y = solve(NL, b, "lower")
+    z = solve(ND, y, "diagonal")
+    a = solve(NL.T, z, "upper")
+    print("a1 é igual a: ", a[0])
+    print("O processo demorou ", datetime.datetime.now()-A)
 
 elif (item == 'b'):
 
@@ -344,6 +408,7 @@ elif (item == 'b'):
     h = delta_x
     pontos = np.array([0.15, 0.3, 0.7, 0.8])
     UTs = np.zeros((N-1, 1))
+    A = datetime.datetime.now()
 
     #---------------------------------------- Inicio da resolucao -----------------------------------------------
 
@@ -355,7 +420,13 @@ elif (item == 'b'):
     Normal, B = Montar(Temps_T, UTs)
 
     print("Os valores 'ak' são: ")
+    NL, ND = decomposeLDLt(Normal)
+    y = solve(NL, B, "lower")
+    z = solve(ND, y, "diagonal")
+    a = solve(NL.T, z, "upper")
+    print("Com decomposição LDLt: {}".format(a))
     print(np.linalg.inv(Normal).dot(B))
+    print("O processo demorou ", datetime.datetime.now()-A)
 
 
 elif (item == 'c'):
@@ -371,6 +442,7 @@ elif (item == 'c'):
     h = delta_x
     todos_UTs, pontos = Ler("teste.txt")
     UTs = []
+    A = datetime.datetime.now()
 
     #---------------------------------------- Inicio da resolucao -----------------------------------------------
 
@@ -383,8 +455,54 @@ elif (item == 'c'):
         cont+=1
 
     Temps_T = Crank(pontos)
+    # Normal, B = Montar(Temps_T, UTs)
+
+    # NL, ND = decomposeLDLt(Normal)
+    # y = solve(NL, B, "lower")
+    # z = solve(ND, y, "diagonal")
+    # aks = solve(NL.T, z, "upper")
+    # #aks = np.linalg.inv(Normal).dot(B)
+    # Erro = Erro_2(aks, UTs, Temps_T, len(pontos))
+
+    # print("Os valores 'ak' são: ")
+    # print(aks)
+    # print("O erro quadratico eh: ", Erro)
+
+    # Cria_graficos(aks, UTs, Temps_T, len(pontos), Erro)
+    # print("O processo demorou ", datetime.datetime.now()-A)
+
+elif (item == 'd'):
+
+    #---------------------------------------- Parametros iniciais -----------------------------------------------
+
+    N = int(input("Digite o valor de N: "))
+    M = N
+    lamb = N
+    delta_t = 1/N
+    delta_x = 1/N
+    L_matriz, D_matriz, LT_matriz = decomporLDL(lamb/2)
+    h = delta_x
+    todos_UTs, pontos = Ler("teste.txt")
+    UTs = []
+    A = datetime.datetime.now()
+
+    #---------------------------------------- Inicio da resolucao -----------------------------------------------
+
+    fator = 2048/N
+    cont = 1
+
+    for i in range (1, 2048):
+        if (i%fator == 0):
+            UTs.append(todos_UTs[i]*(1 + 2*(random.random()-0.5)*0.01))
+        cont+=1
+
+    Temps_T = Crank(pontos)
     Normal, B = Montar(Temps_T, UTs)
-    aks = np.linalg.inv(Normal).dot(B)
+
+    NL, ND = decomposeLDLt(Normal)
+    y = solve(NL, B, "lower")
+    z = solve(ND, y, "diagonal")
+    aks = solve(NL.T, z, "upper")
     Erro = Erro_2(aks, UTs, Temps_T, len(pontos))
 
     print("Os valores 'ak' são: ")
@@ -392,8 +510,8 @@ elif (item == 'c'):
     print("O erro quadratico eh: ", Erro)
 
     Cria_graficos(aks, UTs, Temps_T, len(pontos), Erro)
+    print("O processo demorou ", datetime.datetime.now()-A)
 
-# elif (item == 'd'):
 
 else:
     print("Voce digitou um item não válido, seu BURRO")

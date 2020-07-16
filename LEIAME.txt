@@ -1,10 +1,11 @@
-EP1 - Metodos Numéricos e Aplicações
+EP2 - Metodos Numéricos e Aplicações
 
-O código principal do EP é o arquivo EP1.py, que deve ser executado com Python3.X
+O código principal do EP é o arquivo EP2.py, que deve ser executado com Python3.X
 Ele possui as seguintes dependências:
 
 - numpy         (manipulação matricial)
 - matplotlib    (visualização)
 - datetime      (estimativas de performance)
+- time          (estimativas de performance)
 
-Após a instalação das dependências, basta rodar o arquivo EP1.py
+Após a instalação das dependências, basta rodar o arquivo EP2.py
